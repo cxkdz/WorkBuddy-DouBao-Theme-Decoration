@@ -1,0 +1,17 @@
+# Local state and secrets
+state.json
+*.log
+*.pid
+node-source.json
+quick-launch.json
+gallery-url.txt
+shortcut-backups/
+.env
+.env.*
+
+# Downloaded community themes
+**/themes/dreamskin-*
+**/themes/*.jpg
+**/themes/*.jpeg
+**/themes/*.png
+**/themes/*.webp
