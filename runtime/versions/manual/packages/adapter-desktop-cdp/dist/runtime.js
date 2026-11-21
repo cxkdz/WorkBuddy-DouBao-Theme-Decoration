@@ -1,5 +1,5 @@
 export const DESKTOP_BACKGROUND_SCHEMA = "beauticode.desktop-background.v1";
-export const DESKTOP_BACKGROUND_VERSION = "v2.0";
+export const DESKTOP_BACKGROUND_VERSION = "v2.1";
 /**
  * Host-parameterized renderer payload. Media bytes never cross Runtime.evaluate:
  * the runner uses DOM.setFileInputFiles and this payload consumes the resulting
@@ -93,6 +93,7 @@ var reading=(CFG.contract.readingSelectors||[]).map(function(s){return 'html[dat
 var opaque=scope(['[role="dialog"]','[role="alertdialog"]','[role="menu"]','[role="listbox"]','[role="tooltip"]'].concat(CFG.contract.opaqueSelectors||[]));
 var glass=scope(CFG.contract.glassSelectors||[]);
 var glassInput=scope(['.guidance-input-surface']);
+var headerGlass=scope((CFG.contract.headerSelectors&&CFG.contract.headerSelectors.length)?CFG.contract.headerSelectors:['div[class*="h-header-height"]','header[class*="tabBar-"]','header[class*="fixedPanelHeader-"]']);
 style.textContent='html{--bc-wall-tint:120,120,120;--bc-surface-base:color-mix(in srgb,#34383e 74%,rgb(var(--bc-wall-tint)) 26%);--bc-surface-alpha-pct:82%;--bc-scrim-val:.28;--bc-bg-blur:0px;--bc-stage-fallback:#101114;--bc-scrim-rgb:0,0,0;--bc-panel-bg:rgba(40,43,49,.94);--bc-panel-text:#f1f2f4;--bc-panel-border:rgba(255,255,255,.15);--bc-control-bg:rgba(255,255,255,.09);--bc-control-border:rgba(255,255,255,.16);--bc-overlay-rgb:0,0,0}' +
   // The panel colors are deliberately off-white/charcoal rather than pure
   // #fff/#000: on a photo wallpaper a full white or black plate reads as a
@@ -122,6 +123,10 @@ style.textContent='html{--bc-wall-tint:120,120,120;--bc-surface-base:color-mix(i
   // picture and its hue through, with a light frosted blur.
   (glass?glass+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(52%,var(--bc-surface-alpha-pct)),transparent)!important;backdrop-filter:blur(16px) saturate(1.06)!important}':'') +
   (glassInput?glassInput+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(62%,var(--bc-surface-alpha-pct)),transparent)!important;backdrop-filter:blur(18px) saturate(1.08)!important}':'') +
+  // The 56px title/tab bars were still painting the host's solid
+  // var(--chat-bg-color), which showed up as a black strip above the glass
+  // panels. Keep them one step more opaque than the sidebars but translucent.
+  (headerGlass?headerGlass+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(62%,var(--bc-surface-alpha-pct)),transparent)!important;backdrop-filter:blur(18px) saturate(1.08)!important}':'') +
   '.bc-desktop-pop,.bc-desktop-dialog *,.bc-desktop-pop *{box-sizing:border-box}' +
   '.bc-desktop-pop{position:fixed;z-index:2147483000;width:340px;max-height:calc(100vh - 24px);overflow:auto;padding:6px;border-radius:16px;background:var(--bc-panel-bg);color:var(--bc-panel-text);border:1px solid var(--bc-panel-border);box-shadow:0 22px 55px rgba(0,0,0,.42);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;display:none}' +
   '.bc-desktop-item{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 10px;border-radius:10px}.bc-desktop-item:hover{background:var(--bc-control-bg)}' +
