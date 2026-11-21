@@ -1,5 +1,5 @@
 export const DESKTOP_BACKGROUND_SCHEMA = "beauticode.desktop-background.v1";
-export const DESKTOP_BACKGROUND_VERSION = "v1.9";
+export const DESKTOP_BACKGROUND_VERSION = "v2.0";
 /**
  * Host-parameterized renderer payload. Media bytes never cross Runtime.evaluate:
  * the runner uses DOM.setFileInputFiles and this payload consumes the resulting
@@ -68,7 +68,7 @@ function hostTheme(){
 var lastTheme='';
 var themeObserver=null;
 var themeMedia=null;
-function refreshTheme(){var next=hostTheme();if(next===lastTheme)return false;lastTheme=next;root.setAttribute('data-bc-theme',next);root.setAttribute('data-bc-light',next==='light'||next==='high-contrast-light'?'true':'false');return true}
+function refreshTheme(){var next=hostTheme();if(next===lastTheme)return false;lastTheme=next;root.setAttribute('data-bc-theme',next);root.setAttribute('data-bc-light',next==='light'||next==='high-contrast-light'?'true':'false');try{if(typeof window.__bcDesktopRefreshWall==='function')window.__bcDesktopRefreshWall()}catch(e){}return true}
 function observeTheme(){
   if(themeObserver)themeObserver.disconnect();
   themeObserver=new MutationObserver(function(){refreshTheme();if(document.body!==themeObserverBody)attachThemeBody()});
@@ -91,12 +91,13 @@ var surfaces=scope(CFG.contract.surfaceSelectors);
 var flatten=scope(CFG.contract.flattenSelectors);
 var reading=(CFG.contract.readingSelectors||[]).map(function(s){return 'html[data-bc-active="true"]:is([data-bc-light="true"],[data-bc-theme="high-contrast"]) '+s}).join(',');
 var opaque=scope(['[role="dialog"]','[role="alertdialog"]','[role="menu"]','[role="listbox"]','[role="tooltip"]'].concat(CFG.contract.opaqueSelectors||[]));
-style.textContent='html{--bc-surface-base:#1f1f1f;--bc-surface-alpha-pct:82%;--bc-scrim-val:.28;--bc-bg-blur:0px;--bc-stage-fallback:#101114;--bc-scrim-rgb:0,0,0;--bc-panel-bg:rgba(31,31,31,.97);--bc-panel-text:#eee;--bc-panel-border:rgba(255,255,255,.18);--bc-control-bg:rgba(255,255,255,.08);--bc-control-border:rgba(255,255,255,.17);--bc-overlay-rgb:0,0,0}' +
-  // A light host reads its text off the white veil, not off panel plates (same
-  // call as the Codex adapter): reading surfaces get no floor and the veil takes
-  // the contrast, so the wallpaper stays visible. High contrast still floors at
-  // 100% below.
-  'html[data-bc-theme="light"]{--bc-surface-base:#fff;--bc-scrim-val:.2;--bc-reading-min:0%;--bc-stage-fallback:#f7f8fa;--bc-scrim-rgb:255,255,255;--bc-panel-bg:rgba(255,255,255,.97);--bc-panel-text:#202124;--bc-panel-border:rgba(0,0,0,.16);--bc-control-bg:rgba(0,0,0,.05);--bc-control-border:rgba(0,0,0,.16);--bc-overlay-rgb:255,255,255}' +
+var glass=scope(CFG.contract.glassSelectors||[]);
+var glassInput=scope(['.guidance-input-surface']);
+style.textContent='html{--bc-wall-tint:120,120,120;--bc-surface-base:color-mix(in srgb,#34383e 74%,rgb(var(--bc-wall-tint)) 26%);--bc-surface-alpha-pct:82%;--bc-scrim-val:.28;--bc-bg-blur:0px;--bc-stage-fallback:#101114;--bc-scrim-rgb:0,0,0;--bc-panel-bg:rgba(40,43,49,.94);--bc-panel-text:#f1f2f4;--bc-panel-border:rgba(255,255,255,.15);--bc-control-bg:rgba(255,255,255,.09);--bc-control-border:rgba(255,255,255,.16);--bc-overlay-rgb:0,0,0}' +
+  // The panel colors are deliberately off-white/charcoal rather than pure
+  // #fff/#000: on a photo wallpaper a full white or black plate reads as a
+  // separate window. A small wallpaper tint is injected below at runtime.
+  'html[data-bc-theme="light"]{--bc-surface-base:color-mix(in srgb,#d8d5cf 74%,rgb(var(--bc-wall-tint)) 26%);--bc-scrim-val:.2;--bc-reading-min:0%;--bc-stage-fallback:#f7f8fa;--bc-scrim-rgb:255,255,255;--bc-panel-bg:rgba(242,240,235,.94);--bc-panel-text:#24272b;--bc-panel-border:rgba(0,0,0,.13);--bc-control-bg:rgba(0,0,0,.05);--bc-control-border:rgba(0,0,0,.14);--bc-overlay-rgb:255,255,255}' +
   'html[data-bc-theme="high-contrast"]{--bc-surface-base:#000;--bc-surface-alpha-pct:90%;--bc-scrim-val:.18;--bc-stage-fallback:#000;--bc-scrim-rgb:0,0,0;--bc-panel-bg:#000;--bc-panel-text:#fff;--bc-panel-border:#fff;--bc-control-bg:#000;--bc-control-border:#fff;--bc-overlay-rgb:0,0,0}' +
   'html[data-bc-theme="high-contrast-light"]{--bc-surface-base:#fff;--bc-stage-fallback:#fff;--bc-scrim-rgb:255,255,255;--bc-panel-bg:#fff;--bc-panel-text:#000;--bc-panel-border:#000;--bc-control-bg:#fff;--bc-control-border:#000;--bc-overlay-rgb:255,255,255}' +
   'html[data-bc-active="true"],html[data-bc-active="true"] body{background:transparent!important}body{isolation:isolate}' +
@@ -116,6 +117,11 @@ style.textContent='html{--bc-surface-base:#1f1f1f;--bc-surface-alpha-pct:82%;--b
   'html[data-bc-theme^="high-contrast"]{--bc-reading-min:100%}' +
   (reading?reading+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(var(--bc-reading-min,0%),var(--bc-surface-alpha-pct)),transparent)!important}':'') +
   opaque+'{background-color:var(--bc-surface-base)!important}' +
+  // Solid host sidebars/input plates were the main "black window / white
+  // window" contrast against the wallpaper. Keep a readable tint but let the
+  // picture and its hue through, with a light frosted blur.
+  (glass?glass+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(52%,var(--bc-surface-alpha-pct)),transparent)!important;backdrop-filter:blur(16px) saturate(1.06)!important}':'') +
+  (glassInput?glassInput+'{background-color:color-mix(in srgb,var(--bc-surface-base) max(62%,var(--bc-surface-alpha-pct)),transparent)!important;backdrop-filter:blur(18px) saturate(1.08)!important}':'') +
   '.bc-desktop-pop,.bc-desktop-dialog *,.bc-desktop-pop *{box-sizing:border-box}' +
   '.bc-desktop-pop{position:fixed;z-index:2147483000;width:340px;max-height:calc(100vh - 24px);overflow:auto;padding:6px;border-radius:16px;background:var(--bc-panel-bg);color:var(--bc-panel-text);border:1px solid var(--bc-panel-border);box-shadow:0 22px 55px rgba(0,0,0,.42);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;display:none}' +
   '.bc-desktop-item{display:flex;align-items:center;gap:10px;min-height:46px;padding:7px 10px;border-radius:10px}.bc-desktop-item:hover{background:var(--bc-control-bg)}' +
@@ -136,8 +142,38 @@ window.__bcDesktopApplyResult=window.__bcDesktopApplyResult||{};
 window.__bcDesktopPersistStore=PERSIST;if(!Array.isArray(PERSIST.themes))PERSIST.themes=[];
 function persist(){PERSIST.schema=CFG.schema;window.__bcDesktopPersistDirty=(window.__bcDesktopPersistDirty||0)+1}
 window.__bcDesktopPersistGet=function(){return JSON.stringify(PERSIST)};
-function clearMedia(){stage.querySelectorAll('.bc-media').forEach(function(n){var u=n.dataset.blobUrl;if(u)URL.revokeObjectURL(u);n.remove()});root.removeAttribute('data-bc-active');root.removeAttribute('data-bc-media')}
-function setVars(){root.style.setProperty('--bc-scrim-val',String(Math.max(0,Math.min(100,+PERSIST.dim||0))/100));root.style.setProperty('--bc-bg-blur',(Math.max(0,Math.min(100,+PERSIST.blur||0))*.09).toFixed(2)+'px');root.style.setProperty('--bc-surface-alpha-pct',(100-Math.max(0,Math.min(100,+PERSIST.alpha||0)))+'%');var b=Math.max(0,Math.min(100,+PERSIST.blur||0));if(b>0)root.setAttribute('data-bc-blur-user','');else root.removeAttribute('data-bc-blur-user')}
+var wallSampleKey='',wallSample=null;
+function sampleWallpaper(){
+  var media=stage.querySelector('.bc-media');
+  if(!media||media.tagName!=='IMG'||!media.naturalWidth){wallSample=null;wallSampleKey='';root.style.removeProperty('--bc-wall-tint');root.removeAttribute('data-bc-wall-tone');return}
+  var key=media.currentSrc||media.src;
+  if(key===wallSampleKey&&wallSample)return;
+  try{
+    var c=document.createElement('canvas');c.width=24;c.height=24;
+    var ctx=c.getContext('2d');ctx.drawImage(media,0,0,24,24);
+    var d=ctx.getImageData(0,0,24,24).data,r=0,g=0,b=0,n=0;
+    for(var i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2];n++}
+    r=Math.round(r/n);g=Math.round(g/n);b=Math.round(b/n);
+    wallSample={r:r,g:g,b:b,lum:(.2126*r+.7152*g+.0722*b)/255};wallSampleKey=key;
+    root.style.setProperty('--bc-wall-tint',r+','+g+','+b);
+    root.setAttribute('data-bc-wall-tone',wallSample.lum<.42?'dark':wallSample.lum>.68?'light':'mid');
+  }catch(e){wallSample=null;wallSampleKey='';root.style.removeProperty('--bc-wall-tint');root.removeAttribute('data-bc-wall-tone')}
+}
+function applyScrim(){
+  var light=lastTheme==='light'||lastTheme==='high-contrast-light';
+  var val=Math.max(0,Math.min(100,+PERSIST.dim||0))/100;
+  if(wallSample&&lastTheme.indexOf('high-contrast')!==0){
+    // Only lift a wallpaper that cannot carry the host's text color; a picture
+    // that is already dark in dark mode (or light in light mode) stays untouched.
+    if(light&&wallSample.lum<.46)val=Math.max(val,Math.min(.52,(.52-wallSample.lum)/Math.max(.35,1-wallSample.lum)));
+    else if(!light&&wallSample.lum>.64)val=Math.max(val,Math.min(.52,(wallSample.lum-.48)/Math.max(.25,wallSample.lum)));
+  }
+  root.style.setProperty('--bc-scrim-rgb',light?'255,255,255':'0,0,0');
+  root.style.setProperty('--bc-scrim-val',val.toFixed(2));
+}
+window.__bcDesktopRefreshWall=function(){sampleWallpaper();applyScrim()};
+function clearMedia(){stage.querySelectorAll('.bc-media').forEach(function(n){var u=n.dataset.blobUrl;if(u)URL.revokeObjectURL(u);n.remove()});root.removeAttribute('data-bc-active');root.removeAttribute('data-bc-media');wallSample=null;wallSampleKey='';root.style.removeProperty('--bc-wall-tint');root.removeAttribute('data-bc-wall-tone')}
+function setVars(){sampleWallpaper();applyScrim();root.style.setProperty('--bc-bg-blur',(Math.max(0,Math.min(100,+PERSIST.blur||0))*.09).toFixed(2)+'px');root.style.setProperty('--bc-surface-alpha-pct',(100-Math.max(0,Math.min(100,+PERSIST.alpha||0)))+'%');var b=Math.max(0,Math.min(100,+PERSIST.blur||0));if(b>0)root.setAttribute('data-bc-blur-user','');else root.removeAttribute('data-bc-blur-user')}
 setVars();
 
 var pop=document.createElement('div');pop.id=PANEL;pop.className='bc-desktop-pop';pop.setAttribute('data-bc-desktop',CFG.kind);document.body.appendChild(pop);
@@ -166,7 +202,7 @@ async function applyFile(file,meta){var kind=mediaKind(file);if(!kind){say(CFG.s
   var themeName=meta.save?String(meta.name||'').trim().slice(0,80):'';if(meta.save&&!themeName)throw new Error('theme name required');
   var url=URL.createObjectURL(file),el=document.createElement(kind==='video'?'video':'img');el.className='bc-media';el.dataset.blobUrl=url;if(Number.isFinite(+meta.focusX)){var fx=Math.min(1,Math.max(0,+meta.focusX)),fy=Number.isFinite(+meta.focusY)?Math.min(1,Math.max(0,+meta.focusY)):0.5;el.style.objectPosition=(fx*100).toFixed(1)+'% '+(fy*100).toFixed(1)+'%'}if(kind==='video'){el.loop=true;el.playsInline=true;el.muted=PERSIST.muted;el.preload='auto'}
   try{await new Promise(function(resolve,reject){var done=false;var timer=setTimeout(function(){if(!done){done=true;reject(new Error('media timeout'))}},30000);var ok=function(){if(done)return;done=true;clearTimeout(timer);resolve()};var bad=function(){if(done)return;done=true;clearTimeout(timer);reject(new Error('media load failed'))};if(kind==='video'){el.addEventListener('loadeddata',ok,{once:true});el.addEventListener('error',bad,{once:true})}else{el.addEventListener('load',ok,{once:true});el.addEventListener('error',bad,{once:true})}el.src=url})}catch(e){URL.revokeObjectURL(url);throw e}
-  var old=[].slice.call(stage.querySelectorAll('.bc-media'));stage.appendChild(el);old.forEach(function(n){var u=n.dataset.blobUrl;if(u)URL.revokeObjectURL(u);n.remove()});root.setAttribute('data-bc-active','true');root.setAttribute('data-bc-media',kind);if(kind==='video'){try{await el.play()}catch(e){}}
+  var old=[].slice.call(stage.querySelectorAll('.bc-media'));stage.appendChild(el);old.forEach(function(n){var u=n.dataset.blobUrl;if(u)URL.revokeObjectURL(u);n.remove()});root.setAttribute('data-bc-active','true');root.setAttribute('data-bc-media',kind);if(kind==='video'){try{await el.play()}catch(e){}}window.__bcDesktopRefreshWall();
   PERSIST.wallpaper=meta.path;PERSIST.cleared=false;PERSIST.muted=!!PERSIST.muted;
   if(meta.save){var found=PERSIST.themes.find(function(t){return t.path===meta.path || (meta.provenance&&t.provenance&&t.provenance.source==='hnnulwh'&&t.provenance.sourceSkinId===meta.provenance.sourceSkinId)});if(found){found.name=themeName;found.type=kind;if(meta.provenance)found.provenance=meta.provenance;found.path=meta.path}else{found={id:meta.themeId||('theme-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)),name:themeName,path:meta.path,type:kind};if(meta.provenance)found.provenance=meta.provenance;PERSIST.themes.push(found)}var fx=+meta.focusX,fy=+meta.focusY;if(Number.isFinite(fx)){found.focusX=Math.min(1,Math.max(0,fx));found.focusY=Number.isFinite(fy)?Math.min(1,Math.max(0,fy)):0.5}PERSIST.activeThemeId=found.id}else if(meta.themeId){PERSIST.activeThemeId=meta.themeId}
   persist();syncThemes();say(kind==='video'?CFG.strings.appliedVideo:CFG.strings.appliedImage);return true}
@@ -189,6 +225,6 @@ root.setAttribute('data-bc-desktop-host',CFG.kind);root.setAttribute('data-bc-de
 })()`;
 }
 export function buildDesktopBackgroundCleanup(kind) {
-    return `(()=>{if(window.__bcDesktopAbort){try{window.__bcDesktopAbort.abort()}catch(e){}}if(window.__bcDesktopThemeObserver){try{window.__bcDesktopThemeObserver.disconnect()}catch(e){}}document.querySelectorAll('[data-bc-desktop="${kind}"]').forEach(n=>n.remove());const r=document.documentElement;r.removeAttribute('data-bc-desktop-host');r.removeAttribute('data-bc-desktop-build');r.removeAttribute('data-bc-active');r.removeAttribute('data-bc-media');r.removeAttribute('data-bc-light');r.removeAttribute('data-bc-theme');r.removeAttribute('data-bc-blur-user');r.style.removeProperty('--bc-scrim-val');r.style.removeProperty('--bc-bg-blur');r.style.removeProperty('--bc-surface-alpha-pct');delete window.__bcDesktopAbort;delete window.__bcDesktopThemeObserver;delete window.__bcDesktopThemeMedia;delete window.__bcDesktopPersistStore;delete window.__bcDesktopPersistGet;delete window.__bcDesktopRestoreState;delete window.__bcDesktopPrepareFile;delete window.__bcDesktopApplyGallery;delete window.__bcDesktopApplyRequest;delete window.__bcDesktopPickRequest;delete window.__bcDesktopSkinCenterRequest;return 'cleaned'})()`;
+    return `(()=>{if(window.__bcDesktopAbort){try{window.__bcDesktopAbort.abort()}catch(e){}}if(window.__bcDesktopThemeObserver){try{window.__bcDesktopThemeObserver.disconnect()}catch(e){}}document.querySelectorAll('[data-bc-desktop="${kind}"]').forEach(n=>n.remove());const r=document.documentElement;r.removeAttribute('data-bc-desktop-host');r.removeAttribute('data-bc-desktop-build');r.removeAttribute('data-bc-active');r.removeAttribute('data-bc-media');r.removeAttribute('data-bc-light');r.removeAttribute('data-bc-theme');r.removeAttribute('data-bc-blur-user');r.removeAttribute('data-bc-wall-tone');r.style.removeProperty('--bc-scrim-val');r.style.removeProperty('--bc-scrim-rgb');r.style.removeProperty('--bc-bg-blur');r.style.removeProperty('--bc-surface-alpha-pct');r.style.removeProperty('--bc-wall-tint');delete window.__bcDesktopAbort;delete window.__bcDesktopThemeObserver;delete window.__bcDesktopThemeMedia;delete window.__bcDesktopPersistStore;delete window.__bcDesktopPersistGet;delete window.__bcDesktopRestoreState;delete window.__bcDesktopPrepareFile;delete window.__bcDesktopApplyGallery;delete window.__bcDesktopApplyRequest;delete window.__bcDesktopPickRequest;delete window.__bcDesktopSkinCenterRequest;delete window.__bcDesktopRefreshWall;return 'cleaned'})()`;
 }
 //# sourceMappingURL=runtime.js.map
