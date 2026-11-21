@@ -1,0 +1,1 @@
+{ "schema":"beauticode.runtime/v1","host":"doubao","version":"manual","entrypoint":"scripts/desktop-cdp-runner.mjs" }
