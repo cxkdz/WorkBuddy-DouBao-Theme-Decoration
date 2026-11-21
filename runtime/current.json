@@ -1,0 +1,6 @@
+{
+  "schema": "beauticode.runtime/v1",
+  "host": "workbuddy",
+  "version": "v-1795199210003-30860-4aefc443",
+  "entrypoint": "scripts/wb-cdp-runner.mjs"
+}
